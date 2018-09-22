@@ -1,12 +1,15 @@
 package com.csanford.dsdbot;
 
 import com.ullink.slack.simpleslackapi.SlackChannel;
+import com.ullink.slack.simpleslackapi.SlackMessageHandle;
 import com.ullink.slack.simpleslackapi.SlackSession;
 import com.ullink.slack.simpleslackapi.SlackUser;
-import com.ullink.slack.simpleslackapi.events.SlackMessagePosted;
 import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
+import com.ullink.slack.simpleslackapi.listeners.SlackMessageDeletedListener;
 import com.ullink.slack.simpleslackapi.listeners.SlackMessagePostedListener;
+import com.ullink.slack.simpleslackapi.replies.SlackMessageReply;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.security.auth.login.LoginException;
@@ -17,6 +20,7 @@ import net.dv8tion.jda.core.entities.Member;
 import net.dv8tion.jda.core.entities.Message;
 import net.dv8tion.jda.core.entities.Message.MentionType;
 import net.dv8tion.jda.core.entities.User;
+import net.dv8tion.jda.core.events.message.MessageDeleteEvent;
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.core.exceptions.RateLimitedException;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
@@ -30,6 +34,8 @@ public class App extends ListenerAdapter
 {
 
     private final SlackSession slackSession;
+    private static Map< String, Message > stodMessages = new HashMap<>();
+    private Map< Long, String > dtosMessages = new HashMap<>();
 
     public App( SlackSession slackSession )
     {
@@ -48,7 +54,7 @@ public class App extends ListenerAdapter
 	jda.addEventListener( new App( session ) );
 
 	SlackMessagePostedListener slackMessagePostedListener
-		= ( SlackMessagePosted event, SlackSession session1 ) ->
+		= ( event, session1 ) ->
 	{
 	    // Slack Message Listener
 	    String slackMessage = event.getMessageContent();
@@ -74,11 +80,26 @@ public class App extends ListenerAdapter
 		discordMessage.append( slackMessage );
 
 		// Send the discord message
-		jda.getTextChannelsByName( Constants.DISCORD_CHANNEL, true ).get( 0 )
+		Message message = jda.getTextChannelsByName( Constants.DISCORD_CHANNEL, true ).get( 0 )
 			.sendMessage( discordMessage.toString() ).complete();
+		
+		stodMessages.put( event.getTimestamp(), message );
 	    }
 	};
+	
+	SlackMessageDeletedListener slackMessageDeletedListener = ( event, session2 ) ->
+	{
+	    // Message deleted on slack
+	    String selfId = session2.sessionPersona().getId();
+	    Message discordMsg = stodMessages.remove( event.getMessageTimestamp() );
+	    if ( discordMsg != null )
+	    {
+		discordMsg.delete().complete();
+	    }
+	};
+	
 	session.addMessagePostedListener( slackMessagePostedListener );
+	session.addMessageDeletedListener( slackMessageDeletedListener );
     }
 
     @Override
@@ -97,7 +118,20 @@ public class App extends ListenerAdapter
 	    slackMessage.append( discordMessage.getContentDisplay() );
 	    
 	    SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
-	    slackSession.sendMessage( channel, slackMessage.toString() );
+	    SlackMessageHandle<SlackMessageReply> sendMessage = slackSession.sendMessage( channel, slackMessage.toString() );
+	    dtosMessages.put( event.getMessageIdLong(), sendMessage.getReply().getTimestamp() );
+	}
+    }
+    
+    @Override
+    public void onMessageDelete( MessageDeleteEvent event )
+    {
+	// Message deleted from Discord
+	String timestamp = dtosMessages.remove( event.getMessageIdLong() );
+	if ( timestamp != null )
+	{
+	    SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
+	    slackSession.deleteMessage( timestamp, channel );
 	}
     }
 }
