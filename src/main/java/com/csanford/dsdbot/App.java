@@ -11,6 +11,8 @@ import com.ullink.slack.simpleslackapi.replies.SlackMessageReply;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 import javax.security.auth.login.LoginException;
 import net.dv8tion.jda.core.AccountType;
@@ -35,7 +37,9 @@ public class App extends ListenerAdapter
 
     private final SlackSession slackSession;
     private static Map< String, Message > stodMessages = new HashMap<>();
-    private Map< Long, String > dtosMessages = new HashMap<>();
+    private static Queue<String> stodHistory = new ConcurrentLinkedQueue<>();
+    private static Map< Long, String > dtosMessages = new HashMap<>();
+    private static Queue< Long > dtosHistory = new ConcurrentLinkedQueue<>();
 
     public App( SlackSession slackSession )
     {
@@ -83,7 +87,7 @@ public class App extends ListenerAdapter
 		Message message = jda.getTextChannelsByName( Constants.DISCORD_CHANNEL, true ).get( 0 )
 			.sendMessage( discordMessage.toString() ).complete();
 		
-		stodMessages.put( event.getTimestamp(), message );
+		saveDiscordMessage( event.getTimestamp(), message );
 	    }
 	};
 	
@@ -118,8 +122,9 @@ public class App extends ListenerAdapter
 	    slackMessage.append( discordMessage.getContentDisplay() );
 	    
 	    SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
-	    SlackMessageHandle<SlackMessageReply> sendMessage = slackSession.sendMessage( channel, slackMessage.toString() );
-	    dtosMessages.put( event.getMessageIdLong(), sendMessage.getReply().getTimestamp() );
+	    SlackMessageHandle<SlackMessageReply> sendMessage = 
+		    slackSession.sendMessage( channel, slackMessage.toString() );
+	    saveSlackMessage( event.getMessageIdLong(), sendMessage.getReply().getTimestamp() );
 	}
     }
     
@@ -133,5 +138,37 @@ public class App extends ListenerAdapter
 	    SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
 	    slackSession.deleteMessage( timestamp, channel );
 	}
+    }
+    
+    /**
+     * Save a discord message with a slack timestamp.
+     * @param timestamp Timestamp of slack message.
+     * @param message Discord message object.
+     */
+    private static void saveDiscordMessage( String timestamp, Message message )
+    {
+	stodHistory.add( timestamp );
+	if ( stodHistory.size() > Constants.MAX_MSG_HISTORY - 1 )
+	{
+	    // Log this probably
+	    stodMessages.remove( stodHistory.remove() );
+	}
+	stodMessages.put( timestamp, message );
+    }
+    
+    /**
+     * Save a slack message with a discord message long id.
+     * @param messageId The Discord long message id.
+     * @param timestamp Timestamp of slack message.
+     */
+    public static void saveSlackMessage( Long messageId, String timestamp )
+    {
+	dtosHistory.add( messageId );
+	if ( dtosHistory.size() > Constants.MAX_MSG_HISTORY - 1 )
+	{
+	    // Log this probably
+	    dtosMessages.remove( dtosHistory.remove() );
+	}
+	dtosMessages.put( messageId, timestamp );
     }
 }
