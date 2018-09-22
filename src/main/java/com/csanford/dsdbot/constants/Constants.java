@@ -1,4 +1,4 @@
-package com.csanford.dsdbot;
+package com.csanford.dsdbot.constants;
 
 /**
  *
