@@ -1,2 +1,3 @@
 /target/
 /src/main/java/com/csanford/dsdbot/SecureConstants.java 
+/src/main/java/com/csanford/dsdbot/constants/SecureConstants.java

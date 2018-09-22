@@ -7,17 +7,23 @@ import com.ullink.slack.simpleslackapi.SlackSession;
 import com.ullink.slack.simpleslackapi.SlackUser;
 import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
 import com.ullink.slack.simpleslackapi.listeners.ReactionAddedListener;
+import com.ullink.slack.simpleslackapi.listeners.ReactionRemovedListener;
 import com.ullink.slack.simpleslackapi.listeners.SlackMessageDeletedListener;
 import com.ullink.slack.simpleslackapi.listeners.SlackMessagePostedListener;
 import com.ullink.slack.simpleslackapi.listeners.SlackMessageUpdatedListener;
+import com.vdurmont.emoji.Emoji;
+import com.vdurmont.emoji.EmojiManager;
 import java.io.IOException;
 import java.util.Map;
 import java.util.stream.Collectors;
 import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.entities.Message;
+import net.dv8tion.jda.core.entities.MessageReaction;
+import static net.dv8tion.jda.core.requests.RestAction.DEFAULT_SUCCESS;
 
 /**
  * Provides an encapsulation of Slack listeners.
+ *
  * @author csanford
  * @date Sep 22, 2018
  */
@@ -30,6 +36,7 @@ public class SlackConnector
 
 	/**
 	 * Create the Slack to Discord connector.
+	 *
 	 * @param jda The Discord instance we'll be talking to.
 	 * @param messageHistory A message history to keep track of messages sent.
 	 */
@@ -49,19 +56,22 @@ public class SlackConnector
 		addMessageUpdatedListener();
 		addMessageDeletedListener();
 		addReactionAddedListener();
+		addReactionRemovedListener();
 	}
-	
+
 	/**
 	 * Connect the Slack session.
-	 * @throws IOException 
+	 *
+	 * @throws IOException
 	 */
 	public void connect() throws IOException
 	{
 		slackSession.connect();
 	}
-	
+
 	/**
 	 * Getter for the Slack session.
+	 *
 	 * @return The Slack session.
 	 */
 	public SlackSession getSlackSession()
@@ -70,9 +80,8 @@ public class SlackConnector
 	}
 
 	/**
-	 * Adds the message posted listener to the Slack session.
-	 * Currently takes the Slack message, translates it a bit, then posts it to
-	 * Discord and saves the message to the history.
+	 * Adds the message posted listener to the Slack session. Currently takes the Slack message, translates it a bit, then posts it to Discord and
+	 * saves the message to the history.
 	 */
 	private void addMessagePostedListener()
 	{
@@ -100,9 +109,8 @@ public class SlackConnector
 	}
 
 	/**
-	 * Adds the message updated listener to the Slack session.
-	 * Currently finds the message in the history and updates it, updating the
-	 * message in Discord.
+	 * Adds the message updated listener to the Slack session. Currently finds the message in the history and updates it, updating the message in
+	 * Discord.
 	 */
 	private void addMessageUpdatedListener()
 	{
@@ -125,9 +133,8 @@ public class SlackConnector
 	}
 
 	/**
-	 * Adds the message delted listener to the Slack session.
-	 * Currently just finds the message in the history and deletes it, along with
-	 * deleting it from Discord.
+	 * Adds the message delted listener to the Slack session. Currently just finds the message in the history and deletes it, along with deleting it
+	 * from Discord.
 	 */
 	private void addMessageDeletedListener()
 	{
@@ -145,30 +152,63 @@ public class SlackConnector
 	}
 
 	/**
-	 * Adds the reaction added listener to the Slack session.
-	 * Currently doesn't work :(
+	 * Adds the reaction added listener to the Slack session. Currently doesn't work :(
 	 */
 	private void addReactionAddedListener()
 	{
 		ReactionAddedListener slackReactionAddedListener = ( event, session ) ->
 		{
-			Message message = messageHistory.getDiscordMessage( event.getMessageID() );
+			final String timestamp = event.getMessageID();
+			Message message = messageHistory.getDiscordMessage( timestamp );
 			if ( message != null )
 			{
-				System.out.println( event.getEmojiName() );
-				message.addReaction( event.getEmojiName() ).complete();
+				Emoji emoji = EmojiManager.getForAlias( event.getEmojiName() );
+				message.addReaction( emoji.getUnicode() ).queue( o -> updateDiscordMessage( timestamp, message ) );
 			}
 		};
 
 		slackSession.addReactionAddedListener( slackReactionAddedListener );
 	}
 
+	private void addReactionRemovedListener()
+	{
+		ReactionRemovedListener slackReactionRemovedListener = ( event, session ) ->
+		{
+			final String timestamp = event.getMessageID();
+			Message message = messageHistory.getDiscordMessage( timestamp );
+			if ( message != null )
+			{
+				MessageReaction msgReaction = message.getReactions().stream()
+						.filter( reaction ->
+						{
+							String reactionEmoji = reaction.getReactionEmote().getName();
+							String slackEmoji = EmojiManager.getForAlias( event.getEmojiName() ).getUnicode();
+							return reactionEmoji.equalsIgnoreCase( slackEmoji );
+						} )
+						.findFirst()
+						.orElseThrow( () -> new IllegalArgumentException() );
+
+				msgReaction.removeReaction().queue( o -> updateDiscordMessage( timestamp, message ) );
+			}
+		};
+
+		slackSession.addReactionRemovedListener( slackReactionRemovedListener );
+	}
+	
+	private void updateDiscordMessage( String timestamp, Message message )
+	{
+		final Long messageID = message.getIdLong();
+		messageHistory.saveDiscordMessage( timestamp,
+						message.getChannel().getMessageById( messageID ).complete() );
+	}
+
 	/**
 	 * Converts a Slack message to Discord message style.
+	 *
 	 * @param slackMessage The slack message sent.
 	 * @param sender The sender of the message OR null if the sender is unknown.
 	 * @param session The Slack session, used for translation of names.
-	 * @return 
+	 * @return
 	 */
 	private static String convertSlackMessage( String slackMessage, String sender, SlackSession session )
 	{
