@@ -8,7 +8,7 @@ package com.csanford.dsdbot.constants;
 public class SecureConstants
 {
     public static final String SLACK_TOKEN
-	    = "xoxb-291182102896-jpliJnTEUVAMkZmvXXTFZeiA";
+	    = /* Slack Token */;
     public static final String DISCORD_TOKEN
-	    = "Mzk1Mzg3MTI3OTM4MTU0NTA2.DSYPCw.xi_Axu9hUxe735DJlmQxxzAIV5U";
+	    = /* Discord Token */;
 }
