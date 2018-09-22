@@ -9,6 +9,8 @@
     </Appenders>
     <Loggers>
 	<Logger name="com.csanford.dsdbot" level="info" />
+	<Logger name="com.csanford.dsdbot.DiscordConnector" level="debug" />
+	<Logger name="com.csanford.dsdbot.SlackConnector" level="debug" />
         <Root level="warn">
             <AppenderRef ref="Console" />
             <AppenderRef ref="MyFile"/>
