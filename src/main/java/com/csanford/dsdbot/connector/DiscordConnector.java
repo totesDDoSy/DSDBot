@@ -15,6 +15,8 @@ import net.dv8tion.jda.core.events.message.MessageUpdateEvent;
 import net.dv8tion.jda.core.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.core.events.message.react.MessageReactionRemoveEvent;
 import net.dv8tion.jda.core.hooks.ListenerAdapter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides a class that extends ListenerAdapter and can be attached to a JDA
@@ -25,6 +27,8 @@ import net.dv8tion.jda.core.hooks.ListenerAdapter;
  */
 public class DiscordConnector extends ListenerAdapter
 {
+    
+    private static final Logger LOG = LoggerFactory.getLogger( DiscordConnector.class );
 
     private final SlackSession slackSession;
     private final MessageHistory messageHistory;
