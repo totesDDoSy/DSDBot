@@ -247,8 +247,6 @@ public class SlackConnector
 		return discordMessage.toString();
 	}
 
-	static private final String WITH_DELIMITER = "((?<=%1$s)|(?=%1$s))";
-
 	private Message convertSlackMessage( String slackMessage, SlackUser sender )
 	{
 		MessageBuilder discordMessage = new MessageBuilder();
@@ -258,7 +256,8 @@ public class SlackConnector
 			discordMessage.append( "**" ).append( sender.getUserName() ).append( "**: " );
 		}
 
-		String[] messageParts = slackMessage.split( String.format( WITH_DELIMITER, "<@U[A-z0-9]{8}>" ) );
+		String[] messageParts = slackMessage.split(
+				String.format( Constants.WITH_DELIMITER, "<@U[A-z0-9]{8}>" ) );
 
 		Arrays.stream( messageParts ).forEach( part ->
 		{

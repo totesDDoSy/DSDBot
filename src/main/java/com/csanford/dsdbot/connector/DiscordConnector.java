@@ -2,10 +2,12 @@ package com.csanford.dsdbot.connector;
 
 import com.csanford.dsdbot.constants.Constants;
 import com.csanford.dsdbot.MessageHistory;
+import com.csanford.dsdbot.constants.UserBiMap;
 import com.ullink.slack.simpleslackapi.SlackChannel;
 import com.ullink.slack.simpleslackapi.SlackSession;
 import com.vdurmont.emoji.Emoji;
 import com.vdurmont.emoji.EmojiManager;
+import java.util.Arrays;
 import net.dv8tion.jda.core.entities.Member;
 import net.dv8tion.jda.core.entities.Message;
 import net.dv8tion.jda.core.entities.User;
@@ -27,140 +29,155 @@ import org.slf4j.LoggerFactory;
  */
 public class DiscordConnector extends ListenerAdapter
 {
-    
-    private static final Logger LOG = LoggerFactory.getLogger( DiscordConnector.class );
 
-    private final SlackSession slackSession;
-    private final MessageHistory messageHistory;
+	private static final Logger LOG = LoggerFactory.getLogger( DiscordConnector.class );
 
-    /**
-     * Create the Discord to Slack connector.
-     *
-     * @param slackSession The Slack session we're talking to.
-     * @param messageHistory A message history to keep track of sent messages.
-     */
-    public DiscordConnector( SlackSession slackSession, MessageHistory messageHistory )
-    {
-	this.slackSession = slackSession;
-	this.messageHistory = messageHistory;
-    }
+	private final SlackSession slackSession;
+	private final MessageHistory messageHistory;
 
-    /**
-     * Message received from Discord listener. Currently takes the message and
-     * posts it to Slack, making sure it wasn't the bot that posted the message.
-     *
-     * @param event The event.
-     */
-    @Override
-    public void onMessageReceived( MessageReceivedEvent event )
-    {
-	// Discord Message Listener
-	Message discordMessage = event.getMessage();
-	User messageAuthor = event.getAuthor();
-	Member selfMember = event.getGuild().getSelfMember();
-	if ( discordMessage.isMentioned( selfMember, Message.MentionType.USER ) && !messageAuthor.isBot() )
+	/**
+	 * Create the Discord to Slack connector.
+	 *
+	 * @param slackSession The Slack session we're talking to.
+	 * @param messageHistory A message history to keep track of sent messages.
+	 */
+	public DiscordConnector( SlackSession slackSession, MessageHistory messageHistory )
 	{
-	    // If the bot was mentioned by not itself, send a slack message
-	    String slackMessage = convertDiscordMessage( messageAuthor.getName(),
-		    discordMessage.getContentDisplay() );
-
-	    SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
-	    String timestamp
-		    = slackSession.sendMessage( channel, slackMessage ).getReply().getTimestamp();
-	    messageHistory.saveSlackMessage( event.getMessageIdLong(), timestamp );
+		this.slackSession = slackSession;
+		this.messageHistory = messageHistory;
 	}
-    }
 
-    /**
-     * Message deleted from Discord listener. Currently just finds the slack
-     * message and deletes it.
-     *
-     * @param event The event.
-     */
-    @Override
-    public void onMessageDelete( MessageDeleteEvent event )
-    {
-	// Message deleted from Discord
-	String timestamp = messageHistory.removeSlackMessage( event.getMessageIdLong() );
-	if ( timestamp != null )
+	/**
+	 * Message received from Discord listener. Currently takes the message and
+	 * posts it to Slack, making sure it wasn't the bot that posted the message.
+	 *
+	 * @param event The event.
+	 */
+	@Override
+	public void onMessageReceived( MessageReceivedEvent event )
 	{
-	    SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
-	    slackSession.deleteMessage( timestamp, channel );
-	}
-    }
+		// Discord Message Listener
+		Message discordMessage = event.getMessage();
+		User messageAuthor = event.getAuthor();
+		Member selfMember = event.getGuild().getSelfMember();
+		if ( discordMessage.isMentioned( selfMember, Message.MentionType.USER ) && !messageAuthor.isBot() )
+		{
+			// If the bot was mentioned by not itself, send a slack message
+			String slackMessage = convertDiscordMessage( messageAuthor,
+					discordMessage );
 
-    /**
-     * Message updated in Discord listener. Currently gets the message from the
-     * history and updates the corresponding message in Slack.
-     *
-     * @param event The event.
-     */
-    @Override
-    public void onMessageUpdate( MessageUpdateEvent event )
-    {
-	String timestamp = messageHistory.getSlackTimestamp( event.getMessageIdLong() );
-	if ( timestamp != null )
+			SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
+			String timestamp
+					= slackSession.sendMessage( channel, slackMessage ).getReply().getTimestamp();
+			messageHistory.saveSlackMessage( event.getMessageIdLong(), timestamp );
+		}
+	}
+
+	/**
+	 * Message deleted from Discord listener. Currently just finds the slack
+	 * message and deletes it.
+	 *
+	 * @param event The event.
+	 */
+	@Override
+	public void onMessageDelete( MessageDeleteEvent event )
 	{
-	    String author = event.getAuthor().getName();
-	    String discordMessage = event.getMessage().getContentDisplay();
-	    String slackMessage = convertDiscordMessage( author, discordMessage );
-	    SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
-	    slackSession.updateMessage( timestamp, channel, slackMessage );
+		// Message deleted from Discord
+		String timestamp = messageHistory.removeSlackMessage( event.getMessageIdLong() );
+		if ( timestamp != null )
+		{
+			SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
+			slackSession.deleteMessage( timestamp, channel );
+		}
 	}
-    }
 
-    /**
-     * Reaction added to Discord message listener. Currently gets the message
-     * from the history and adds the corresponding emoji alias.
-     *
-     * @param event The event.
-     */
-    @Override
-    public void onMessageReactionAdd( MessageReactionAddEvent event )
-    {
-	String timestamp = messageHistory.getSlackTimestamp( event.getMessageIdLong() );
-	if ( timestamp != null )
+	/**
+	 * Message updated in Discord listener. Currently gets the message from the
+	 * history and updates the corresponding message in Slack.
+	 *
+	 * @param event The event.
+	 */
+	@Override
+	public void onMessageUpdate( MessageUpdateEvent event )
 	{
-	    SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
-	    String emote = event.getReaction().getReactionEmote().getName();
-	    Emoji emoji = EmojiManager.getByUnicode( emote );
-	    slackSession.addReactionToMessage( channel, timestamp, emoji.getAliases().get( 0 ) );
+		String timestamp = messageHistory.getSlackTimestamp( event.getMessageIdLong() );
+		if ( timestamp != null )
+		{
+			User author = event.getAuthor();
+			Message discordMessage = event.getMessage();
+			String slackMessage = convertDiscordMessage( author, discordMessage );
+			SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
+			slackSession.updateMessage( timestamp, channel, slackMessage );
+		}
 	}
-    }
 
-    /**
-     * Reaction removed from Discord message listener. Currently gets the message
-     * from the history and removes the corresponding emoji alias.
-     * 
-     * @param event The event.
-     */
-    @Override
-    public void onMessageReactionRemove( MessageReactionRemoveEvent event )
-    {
-	String timestamp = messageHistory.getSlackTimestamp( event.getMessageIdLong() );
-	if ( timestamp != null )
+	/**
+	 * Reaction added to Discord message listener. Currently gets the message
+	 * from the history and adds the corresponding emoji alias.
+	 *
+	 * @param event The event.
+	 */
+	@Override
+	public void onMessageReactionAdd( MessageReactionAddEvent event )
 	{
-	    SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
-	    String emote = event.getReaction().getReactionEmote().getName();
-	    Emoji emoji = EmojiManager.getByUnicode( emote );
-	    slackSession.removeReactionFromMessage( channel, timestamp, emoji.getAliases().get( 0 ) );
+		String timestamp = messageHistory.getSlackTimestamp( event.getMessageIdLong() );
+		if ( timestamp != null )
+		{
+			SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
+			String emote = event.getReaction().getReactionEmote().getName();
+			Emoji emoji = EmojiManager.getByUnicode( emote );
+			slackSession.addReactionToMessage( channel, timestamp, emoji.getAliases().get( 0 ) );
+		}
 	}
-    }
 
-    /**
-     * Prepends the name of the sender to the message.
-     *
-     * @param name Name to prepend, usually the person sending the message.
-     * @param contentDisplay The actual message content.
-     * @return A strick formatted for Slack display in the style of
-     * <b>{name}</b>: {contentDisplay}
-     */
-    private String convertDiscordMessage( String name, String contentDisplay )
-    {
-	StringBuilder slackMessage = new StringBuilder();
+	/**
+	 * Reaction removed from Discord message listener. Currently gets the
+	 * message from the history and removes the corresponding emoji alias.
+	 *
+	 * @param event The event.
+	 */
+	@Override
+	public void onMessageReactionRemove( MessageReactionRemoveEvent event )
+	{
+		String timestamp = messageHistory.getSlackTimestamp( event.getMessageIdLong() );
+		if ( timestamp != null )
+		{
+			SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
+			String emote = event.getReaction().getReactionEmote().getName();
+			Emoji emoji = EmojiManager.getByUnicode( emote );
+			slackSession.removeReactionFromMessage( channel, timestamp, emoji.getAliases().get( 0 ) );
+		}
+	}
 
-	slackMessage.append( "*" ).append( name ).append( "*: " );
-	slackMessage.append( contentDisplay );
-	return slackMessage.toString();
-    }
+	/**
+	 * Prepends the name of the sender to the message.
+	 *
+	 * @param name Name to prepend, usually the person sending the message.
+	 * @param contentDisplay The actual message content.
+	 * @return A strick formatted for Slack display in the style of
+	 * <b>{name}</b>: {contentDisplay}
+	 */
+	private String convertDiscordMessage( User author, Message message )
+	{
+		StringBuilder slackMessage = new StringBuilder();
+
+		slackMessage.append( "*" ).append( author.getName() ).append( "*: " );
+
+		String[] messageParts = message.getContentRaw()
+				.split( String.format( Constants.WITH_DELIMITER, "<@(\\d){18}>" ) );
+		Arrays.stream( messageParts ).forEach( part ->
+		{
+			if ( part.startsWith( "<@" ) )
+			{
+				slackMessage.append( "<@" )
+						.append( UserBiMap.getOrDefault( part.substring( 2, part.length() - 1 ), part ) )
+						.append( ">" );
+			} else
+			{
+				slackMessage.append( part );
+			}
+		} );
+
+		return slackMessage.toString();
+	}
 }
