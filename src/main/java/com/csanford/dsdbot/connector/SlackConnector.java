@@ -101,17 +101,16 @@ public class SlackConnector
 			String slackMessage = event.getMessageContent();
 			String selfId = session.sessionPersona().getId();
 			SlackUser sender = event.getSender();
+			String timestamp = event.getTimestamp();
 			if ( !session.sessionPersona().getId().equals( sender.getId() )
 					&& slackMessage.contains( "@" + selfId ) )
 			{
 				// If the bot didn't send the message and was mentioned, send a discord message
 				Message discordMessage = convertSlackMessage( slackMessage, sender );
-//		LOG.error( convertSlackMessage( slackMessage, sender ).getContentDisplay() );
 				// Send the discord message
-				Message message = jda.getTextChannelsByName( Constants.DISCORD_CHANNEL, true ).get( 0 )
-						.sendMessage( discordMessage ).complete();
-
-				messageHistory.saveDiscordMessage( event.getTimestamp(), message );
+				jda.getTextChannelsByName( Constants.DISCORD_CHANNEL, true ).get( 0 )
+						.sendMessage( discordMessage )
+						.queue( message -> messageHistory.saveDiscordMessage( timestamp, message ) );
 			}
 		};
 
@@ -133,10 +132,9 @@ public class SlackConnector
 				String discordMsg = message.getContentDisplay();
 				StringBuilder slackMessage = new StringBuilder();
 				slackMessage.append( discordMsg.subSequence( 0, discordMsg.indexOf( ' ' ) + 1 ) );
-				slackMessage.append( convertSlackMessage( event.getNewMessage(), null, session ) );
+				slackMessage.append( event.getNewMessage() );
 
-				Message newMessage = message.editMessage( slackMessage.toString() ).complete();
-				// do stuff with history?
+				message.editMessage( convertSlackMessage( slackMessage.toString(), null ) ).queue();
 			}
 		};
 
@@ -164,8 +162,9 @@ public class SlackConnector
 	}
 
 	/**
-	 * Adds the reaction added listener to the Slack session. Currently doesn't
-	 * work :(
+	 * Adds the reaction added listener to the Slack session. Currently gets
+	 * the reaction alias and converts it to a unicode value for Discord then
+	 * adds it to the message.
 	 */
 	private void addReactionAddedListener()
 	{
@@ -183,6 +182,10 @@ public class SlackConnector
 		slackSession.addReactionAddedListener( slackReactionAddedListener );
 	}
 
+	/**
+	 * Adds the reaction removed listener to remove the corresponding reaction
+	 * from the Discord message.
+	 */
 	private void addReactionRemovedListener()
 	{
 		ReactionRemovedListener slackReactionRemovedListener = ( event, session ) ->
@@ -191,6 +194,7 @@ public class SlackConnector
 			Message message = messageHistory.getDiscordMessage( timestamp );
 			if ( message != null )
 			{
+				// Find the first instance of the removed emote on the message
 				MessageReaction msgReaction = message.getReactions().stream()
 						.filter( reaction ->
 						{
@@ -200,7 +204,7 @@ public class SlackConnector
 						} )
 						.findFirst()
 						.orElseThrow( () -> new IllegalArgumentException() );
-
+				// Remove the reaction and update the message history
 				msgReaction.removeReaction().queue( o -> updateDiscordMessage( timestamp, message ) );
 			}
 		};
@@ -208,6 +212,11 @@ public class SlackConnector
 		slackSession.addReactionRemovedListener( slackReactionRemovedListener );
 	}
 
+	/**
+	 * Updates the message history object with a new message.
+	 * @param timestamp Slack message timestamp.
+	 * @param message Discord message.
+	 */
 	private void updateDiscordMessage( String timestamp, Message message )
 	{
 		final Long messageID = message.getIdLong();
@@ -220,47 +229,26 @@ public class SlackConnector
 	 *
 	 * @param slackMessage The slack message sent.
 	 * @param sender The sender of the message OR null if the sender is unknown.
-	 * @param session The Slack session, used for translation of names.
 	 * @return
 	 */
-	private static String convertSlackMessage( String slackMessage, String sender, SlackSession session )
-	{
-		StringBuilder discordMessage = new StringBuilder();
-
-		// Make a map for user IDs to names
-		Map<String, String> usersMap = session.getUsers().stream()
-				.collect( Collectors.toMap( user -> user.getId(), user -> user.getUserName() ) );
-		for ( Map.Entry<String, String> entry : usersMap.entrySet() )
-		{
-			slackMessage = slackMessage
-					.replaceAll( entry.getKey(), entry.getValue() )
-					.replaceAll( "[<>]", "" );
-		}
-
-		if ( sender != null )
-		{
-			discordMessage.append( "**" ).append( sender ).append( "**: " );
-		}
-
-		discordMessage.append( slackMessage );
-
-		return discordMessage.toString();
-	}
-
 	private Message convertSlackMessage( String slackMessage, SlackUser sender )
 	{
 		MessageBuilder discordMessage = new MessageBuilder();
 
+		// If we know who the sender is, add them to the start
 		if ( sender != null )
 		{
 			discordMessage.append( "**" ).append( sender.getUserName() ).append( "**: " );
 		}
 
+		// Break the message up to parts that are either the message content
+		// or the user mentions.
 		String[] messageParts = slackMessage.split(
 				String.format( Constants.WITH_DELIMITER, "<@U[A-z0-9]{8}>" ) );
 
 		Arrays.stream( messageParts ).forEach( part ->
 		{
+			// Convert user mentions.
 			if ( part.startsWith( "<@" ) )
 			{
 				String userId = part.substring( 2, part.length() - 1 );
@@ -271,13 +259,17 @@ public class SlackConnector
 					discordMessage.append( user );
 				} catch ( IllegalArgumentException e )
 				{
-					discordMessage.append( slackSession.getUsers().stream()
-							.filter( user -> user.getId().equalsIgnoreCase( userId ) )
-							.findFirst()
-							.get().getUserName() );
+					LOG.warn( "Could not find user" );
+					discordMessage.append( "@" )
+							.append( slackSession.getUsers().stream()
+								.filter( user -> user.getId().equalsIgnoreCase( userId ) )
+								.findFirst()
+								.get().getUserName() );
 				}
-			} else
+			}
+			else
 			{
+				// Append message text.
 				discordMessage.append( part );
 			}
 		} );

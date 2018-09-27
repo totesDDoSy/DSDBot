@@ -152,10 +152,10 @@ public class DiscordConnector extends ListenerAdapter
 	/**
 	 * Prepends the name of the sender to the message.
 	 *
-	 * @param name Name to prepend, usually the person sending the message.
-	 * @param contentDisplay The actual message content.
+	 * @param author Original author of the message.
+	 * @param message The message that was sent.
 	 * @return A strick formatted for Slack display in the style of
-	 * <b>{name}</b>: {contentDisplay}
+	 * <b>{author}</b>: {content}
 	 */
 	private String convertDiscordMessage( User author, Message message )
 	{
