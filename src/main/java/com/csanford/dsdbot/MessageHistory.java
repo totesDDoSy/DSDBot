@@ -11,7 +11,7 @@ import net.dv8tion.jda.core.entities.Message;
  * Message history is a class used to keep track of the messages sent
  * from both Slack to Discord and Discord to Slack.
  * @author csanford
- * @date Sep 22, 2018
+ * #date Sep 22, 2018
  */
 public class MessageHistory
 {

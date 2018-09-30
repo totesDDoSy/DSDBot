@@ -16,8 +16,6 @@ import com.vdurmont.emoji.Emoji;
 import com.vdurmont.emoji.EmojiManager;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Map;
-import java.util.stream.Collectors;
 import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.MessageBuilder;
 import net.dv8tion.jda.core.entities.Message;
@@ -30,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * Provides an encapsulation of Slack listeners.
  *
  * @author csanford
- * @date Sep 22, 2018
+ * #date Sep 22, 2018
  */
 public class SlackConnector
 {
@@ -71,7 +69,7 @@ public class SlackConnector
 	/**
 	 * Connect the Slack session.
 	 *
-	 * @throws IOException
+	 * @throws IOException Error Connecting.
 	 */
 	public void connect() throws IOException
 	{
@@ -105,6 +103,7 @@ public class SlackConnector
 			if ( !session.sessionPersona().getId().equals( sender.getId() )
 					&& slackMessage.contains( "@" + selfId ) )
 			{
+				LOG.debug( "Slack message posted from " + sender.getUserName() );
 				// If the bot didn't send the message and was mentioned, send a discord message
 				Message discordMessage = convertSlackMessage( slackMessage, sender );
 				// Send the discord message
@@ -154,6 +153,7 @@ public class SlackConnector
 			Message discordMsg = messageHistory.removeDiscordMessage( event.getMessageTimestamp() );
 			if ( discordMsg != null )
 			{
+				LOG.debug( "Slack message deleted" );
 				discordMsg.delete().complete();
 			}
 		};

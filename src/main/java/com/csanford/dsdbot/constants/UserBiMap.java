@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  *
  * @author csanford
- * @date Sep 24, 2018
+ * #date Sep 24, 2018
  */
 public class UserBiMap
 {
@@ -23,7 +23,7 @@ public class UserBiMap
 		DTOS_USERS.put( SecureConstants.CORA_DID, SecureConstants.CORA_SID );
 		DTOS_USERS.put( SecureConstants.WILL_DID, SecureConstants.WILL_SID );
 		DTOS_USERS.put( SecureConstants.CODY_DID, SecureConstants.CODY_SID );
-		DTOS_USERS.put( SecureConstants.DSD_DID, "@dsd-bot" );
+		DTOS_USERS.put( SecureConstants.DSD_DID, "dsd-bot" );
 
 		STOD_USERS = new HashMap<>();
 		STOD_USERS.put( SecureConstants.RANDY_SID, SecureConstants.RANDY_DID );

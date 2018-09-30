@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
  * connection.
  *
  * @author csanford
- * @date Sep 22, 2018
+ * #date Sep 22, 2018
  */
 public class DiscordConnector extends ListenerAdapter
 {
@@ -62,6 +62,7 @@ public class DiscordConnector extends ListenerAdapter
 		Member selfMember = event.getGuild().getSelfMember();
 		if ( discordMessage.isMentioned( selfMember, Message.MentionType.USER ) && !messageAuthor.isBot() )
 		{
+			LOG.debug( "Discord message recieved from " + messageAuthor.getName() );
 			// If the bot was mentioned by not itself, send a slack message
 			String slackMessage = convertDiscordMessage( messageAuthor,
 					discordMessage );
@@ -86,6 +87,7 @@ public class DiscordConnector extends ListenerAdapter
 		String timestamp = messageHistory.removeSlackMessage( event.getMessageIdLong() );
 		if ( timestamp != null )
 		{
+			LOG.debug( "Discord message deleted" );
 			SlackChannel channel = slackSession.findChannelByName( Constants.SLACK_CHANNEL );
 			slackSession.deleteMessage( timestamp, channel );
 		}
