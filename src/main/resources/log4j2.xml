@@ -8,12 +8,12 @@
         </File>
     </Appenders>
     <Loggers>
-	<Logger name="com.csanford.dsdbot" level="info" />
-	<Logger name="com.csanford.dsdbot.DiscordConnector" level="debug" />
-	<Logger name="com.csanford.dsdbot.SlackConnector" level="info" />
-        <Root level="warn">
-            <AppenderRef ref="Console" />
-            <AppenderRef ref="MyFile"/>
-        </Root>
+		<Logger name="com.csanford.dsdbot" level="info" />
+		<Logger name="com.csanford.dsdbot.connector.DiscordConnector" level="debug" />
+		<Logger name="com.csanford.dsdbot.connector.SlackConnector" level="debug" />
+		<Root level="warn">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="MyFile"/>
+		</Root>
     </Loggers>
 </Configuration>

@@ -9,6 +9,7 @@ import com.ullink.slack.simpleslackapi.SlackUser;
 import com.ullink.slack.simpleslackapi.impl.SlackSessionFactory;
 import com.ullink.slack.simpleslackapi.listeners.ReactionAddedListener;
 import com.ullink.slack.simpleslackapi.listeners.ReactionRemovedListener;
+import com.ullink.slack.simpleslackapi.listeners.SlackDisconnectedListener;
 import com.ullink.slack.simpleslackapi.listeners.SlackMessageDeletedListener;
 import com.ullink.slack.simpleslackapi.listeners.SlackMessagePostedListener;
 import com.ullink.slack.simpleslackapi.listeners.SlackMessageUpdatedListener;
@@ -64,6 +65,7 @@ public class SlackConnector
 		addMessageDeletedListener();
 		addReactionAddedListener();
 		addReactionRemovedListener();
+		addDisconnectedListener();
 	}
 
 	/**
@@ -210,6 +212,23 @@ public class SlackConnector
 		};
 
 		slackSession.addReactionRemovedListener( slackReactionRemovedListener );
+	}
+	
+	private void addDisconnectedListener()
+	{
+		SlackDisconnectedListener slackDisconnectedListener = ( event, listener )  ->
+		{
+			LOG.warn( "Connection to Slack lost, attempting to reconnect..." );
+			try
+			{
+				slackSession.connect();
+			} catch ( IOException ex )
+			{
+				LOG.error( "Could not reconnect to Slack session...", ex );
+			}
+		};
+		
+		slackSession.addSlackDisconnectedListener( slackDisconnectedListener );
 	}
 
 	/**

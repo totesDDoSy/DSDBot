@@ -162,17 +162,17 @@ public class DiscordConnector extends ListenerAdapter
 	private String convertDiscordMessage( User author, Message message )
 	{
 		StringBuilder slackMessage = new StringBuilder();
-
 		slackMessage.append( "*" ).append( author.getName() ).append( "*: " );
 
 		String[] messageParts = message.getContentRaw()
-				.split( String.format( Constants.WITH_DELIMITER, "<@(\\d){18}>" ) );
+				.split( String.format( Constants.WITH_DELIMITER, "<@!?(\\d){17,18}>" ) );
 		Arrays.stream( messageParts ).forEach( part ->
 		{
 			if ( part.startsWith( "<@" ) )
 			{
+				String discordId = part.replace( "!", "" ).replace( "<@", "" ).replace( ">", "" );
 				slackMessage.append( "<@" )
-						.append( UserBiMap.getOrDefault( part.substring( 2, part.length() - 1 ), part ) )
+						.append( UserBiMap.getOrDefault( discordId, part ) )
 						.append( ">" );
 			} else
 			{

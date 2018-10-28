@@ -41,6 +41,11 @@ public class UserBiMap
 
 	public static String getOrDefault( String key, String def )
 	{
-		return get( key ) == null ? def : get( key );
+		String value = def;
+		if ( get( key ) != null )
+		{
+			value = get( key );
+		}
+		return value;
 	}
 }
